@@ -39,13 +39,13 @@ module Language.HaLex.Ndfa (
              , ndfadeadstates
              -- * Properties of States
              , ndfaIsStDead
+             , isSyncState
              , ndfanumberIncomingArrows
              , ndfanumberOutgoingArrows
              ) where
 
 import Data.List
 import Language.HaLex.Util
-import Language.HaLex.Dfa
 
 -----------------------------------------------------------------------------
 -- * Data type
@@ -84,7 +84,7 @@ ndfawalk :: Ord st
          -> [sy]                       -- ^ Input symbols
          -> [st]                       -- ^ Reached states
 
-ndfawalk delta sts []     = sts
+ndfawalk _     sts []     = sts
 ndfawalk delta sts (x:xs) =
         ndfawalk delta (epsilon_closure delta (delta' delta sts (Just x))) xs
 
@@ -96,7 +96,7 @@ delta' :: Eq st
        -> (Maybe sy)                   -- ^ Symbol to consume
        -> [st]                         -- ^ Reached states
 
-delta' delta []       sy = []
+delta' _     []       _ = []
 delta' delta (st:sts) sy = (delta st sy) `union` (delta' delta sts sy)
 
 
@@ -115,7 +115,7 @@ epsilon_closure delta = limit f
 
 -- | Print a 'Ndfa' as a Haskell function.
 instance (Eq st , Show st, Show sy) => Show (Ndfa st sy) where
-      showsPrec p (Ndfa v q s z delta) =
+      showsPrec _ (Ndfa v q s z delta) =
                 showString("ndfa = Ndfa v q s z delta") .
                 showString ("\n  where \n\t v = ") .
                 showList v .
@@ -130,6 +130,8 @@ instance (Eq st , Show st, Show sy) => Show (Ndfa st sy) where
                 showString ("\t delta _ _ = []\n")
 
 -- | Helper function to show the transition function of a 'Ndfa'.
+showNdfaDelta :: (Eq st, Show st, Show sy) =>
+                 [st] -> [sy] -> (st -> Maybe sy -> [st]) -> String -> String
 showNdfaDelta q v d = foldr (.) (showChar '\n') f
   where f     = zipWith3 showF m n q'
         (m,n) = unzip l'
@@ -220,7 +222,7 @@ stPath d v sts = sort $ nub $ (concat $ map (ndfadestinationsFrom d v) sts) ++ s
 
 transitionTableNdfa :: Ndfa st sy            -- ^ Automaton
                     -> [(st,Maybe sy,st)]    -- ^ Transition table
-transitionTableNdfa (Ndfa vs qs s z delta) = [ (q,Just v,r)
+transitionTableNdfa (Ndfa vs qs _ _ delta) = [ (q,Just v,r)
                                              | q <- qs , v <- vs
                                              , r <- delta q (Just v)
                                              ] ++
@@ -274,11 +276,11 @@ old2new :: Eq st => [(st,Int)] -> [st] -> [Int]
 old2new nsts sts = map (lookupFst nsts) sts
 
 lookupFst :: Eq st => [(st,Int)] -> st -> Int
-lookupFst nsts ost = snd $ head (filter (\ (a,b) -> a == ost) nsts)
+lookupFst nsts ost = snd $ head (filter (\ (a,_) -> a == ost) nsts)
 
 
 lookupSnd :: [(st,Int)] -> Int -> st
-lookupSnd nsts nst = fst $ head (filter (\ (a,b) -> b == nst) nsts)
+lookupSnd nsts nst = fst $ head (filter (\ (_,b) -> b == nst) nsts)
 
 
 -----------------------------------------------------------------------------
@@ -291,7 +293,7 @@ lookupSnd nsts nst = fst $ head (filter (\ (a,b) -> b == nst) nsts)
 ndfadeadstates :: Ord st
                => Ndfa st sy        -- ^ Automaton
                -> [st]              -- ^ Dead States
-ndfadeadstates (Ndfa v qs s z d) = filter (ndfaIsStDead d v z) qs
+ndfadeadstates (Ndfa v qs _ z d) = filter (ndfaIsStDead d v z) qs
 
 
 -- | The size of an automaton is the number of its states.

@@ -104,13 +104,16 @@ distinguishable (Dfa vs qs _ zs delta) = limit (\x -> nub (x ++ nthdist qs x)) (
 
         move2Disting (a,b) x dist = (delta a x , delta b x) `elem` dist
 
-
-removeinaccessible dfa@(Dfa v s i f d) = Dfa v states i (f `intersect` states) d
+removeinaccessible :: (Ord sy, Ord st) =>
+                      Dfa st sy -> Dfa st sy
+removeinaccessible dfa@(Dfa v _ i f d) = Dfa v states i (f `intersect` states) d
   where states = nub (i:(flowdown [i] (transitionTableDfa dfa)))
         flowdown zz ss = limit (\ x -> nub(x ++ nextlevel ss x)) (nextlevel ss zz)
         nextlevel ss zz = (nub . concat) [ next z ss | z <- zz ]
         next z = concat . map (\(a,_,c) -> if a == z then [c] else [])
 
+removeinaccessible' :: (Ord st, Eq sy) =>
+                       Dfa st sy -> Dfa [st] sy
 removeinaccessible' a = ndfa2dfa . dfa2ndfa $ a
 
 
@@ -184,7 +187,7 @@ reverseDfa :: Eq st
 reverseDfa (Dfa v qs s z delta) = Ndfa v qs z [s] delta'
   where delta' st (Just sy) = [ q | q <- qs
                                   , delta q sy == st ]
-        delta' st Nothing   = []
+        delta' _  Nothing   = []
 
 
 -- | Reverse a 'Ndfa'

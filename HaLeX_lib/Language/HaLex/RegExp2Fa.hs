@@ -67,11 +67,11 @@ regExp2Ndfa' (Then p q) n = ( Ndfa v' q' s' z' delta' , nq)
         q' = qp `union` qq
         s' = sp
         z' = zq
-        delta' q | q `elem` qp = if q `elem` zp then dp' q
-                                                else dp  q
-                 | otherwise   = dq q
-         where dp' q Nothing = (dp q Nothing) `union` sq
-               dp' q (Just aa) = dp q (Just aa)
+        delta' q2 | q2 `elem` qp = if q2 `elem` zp then dp' q2
+                                                   else dp  q2
+                  | otherwise   = dq q2
+         where dp' q3 Nothing   = (dp q3 Nothing) `union` sq
+               dp' q3 (Just aa) = dp q3 (Just aa)
 
 regExp2Ndfa' (Or p q) n = ( Ndfa v' q' s' z' delta' , nq+1 )
   where (Ndfa vp qp sp zp dp , np) = regExp2Ndfa' p (n + 1)
@@ -80,22 +80,22 @@ regExp2Ndfa' (Or p q) n = ( Ndfa v' q' s' z' delta' , nq+1 )
         s' = [n]
         z' = [nq]
         q' = s' `union` qp `union` qq `union` z'
-        delta' q | q `elem` s' = dd q
-                 | q `elem` zp = ddp' q
-                 | q `elem` zq = ddq' q
-                 | q `elem` qp = dp q
-                 | q `elem` qq = dq q
-                 | otherwise   = dd'' q
-         where dd q  Nothing = sp `union` sq
-               dd _ _        = []
+        delta' q2 | q2 `elem` s' = dd q2
+                  | q2 `elem` zp = ddp' q2
+                  | q2 `elem` zq = ddq' q2
+                  | q2 `elem` qp = dp q2
+                  | q2 `elem` qq = dq q2
+                  | otherwise    = dd'' q2
+         where dd _ Nothing = sp `union` sq
+               dd _ _         = []
 
-               ddp' q Nothing = z' `union` (dp q Nothing)
+               ddp' q3 Nothing = z' `union` (dp q3 Nothing)
                ddp' _ _       = []
 
-               ddq' q Nothing = z' `union` (dq q Nothing)
-               ddq' _ _       = []
+               ddq' q3 Nothing = z' `union` (dq q3 Nothing)
+               ddq' _ _        = []
 
-               dd'' _ _ = []
+               dd'' _ _        = []
 
 regExp2Ndfa' (Star p) n = ( Ndfa v' q' s' z' delta' , np+1 )
   where (Ndfa vp qp sp zp dp , np) = regExp2Ndfa' p (n + 1)
@@ -103,13 +103,13 @@ regExp2Ndfa' (Star p) n = ( Ndfa v' q' s' z' delta' , np+1 )
         s' = [n]
         z' = [np]
         q' = s'  `union` qp `union` z'
-        delta' q | q `elem` s' = dd q
-                 | q `elem` zp = dd' q
-                 | otherwise   = dp q
-          where dd q Nothing = sp `union` z'
+        delta' q2 | q2 `elem` s' = dd q2
+                  | q2 `elem` zp = dd' q2
+                  | otherwise    = dp q2
+          where dd _ Nothing = sp `union` z'
                 dd _ _ = []
 
-                dd' q Nothing = sp `union` z'
+                dd' _ Nothing = sp `union` z'
                 dd' _ _ = []
 
 -- | Compute a 'Dfa' from a 'RegExp'.

@@ -50,15 +50,18 @@ import Language.HaLex.Ndfa
 
 type StDfa st = [st]
 
-type CT st = [( StDfa st, [StDfa st])]
+type CT st = [(StDfa st, [StDfa st])]
 
+stsDfa :: [(a, b)] -> [a]
 stsDfa   = map fst
+stsRHS :: [(a, b)] -> [b]
 stsRHS   = map snd
+allstsCT :: [(a, [b])] -> [b]
 allstsCT = concat . stsRHS
 
 
 ndfa2ct :: Ord st => Ndfa st sy -> CT st
-ndfa2ct (Ndfa v q s z delta) = limit (ndfa2dfaStep delta v) ttFstRow
+ndfa2ct (Ndfa v _ s _ delta) = limit (ndfa2dfaStep delta v) ttFstRow
   where  ttFstRow = consRows delta [epsilon_closure delta s] v
 
 
@@ -68,7 +71,7 @@ ndfa2dfaStep delta alfabet ct = nub (ct `union` consRows delta newSts alfabet)
 
 
 consRows :: Ord st => (st -> (Maybe sy) -> [st]) -> [StDfa st] -> [sy] -> CT st
-consRows delta []     alfabet = []
+consRows _     []     _       = []
 consRows delta (q:qs) alfabet = (q , oneRow delta q alfabet) :
                                 (consRows delta qs alfabet)
 
@@ -77,7 +80,7 @@ oneRow :: Ord st => (st -> (Maybe sy) -> [st]) -> (StDfa st) -> [sy] -> [StDfa s
 oneRow delta sts alfabet = map (\ v -> sort (ndfawalk delta sts [v])) alfabet
 
 ndfa2dfa :: (Ord st,Eq sy) => Ndfa st sy -> Dfa [st] sy
-ndfa2dfa ndfa@(Ndfa v q s z delta)  = (Dfa v' q' s' z' delta')
+ndfa2dfa ndfa@(Ndfa v _ _ z _)  = (Dfa v' q' s' z' delta')
   where  tt = ndfa2ct ndfa
          v' = v
          q' = stsDfa tt
@@ -86,12 +89,12 @@ ndfa2dfa ndfa@(Ndfa v q s z delta)  = (Dfa v' q' s' z' delta')
          delta' st sy = lookupCT st sy tt v
 
 finalStatesDfa :: Eq st => [StDfa st] -> [st] -> [StDfa st]
-finalStatesDfa []     z = []
+finalStatesDfa []     _ = []
 finalStatesDfa (q:qs) z | (q `intersect` z /= []) = q : finalStatesDfa qs z
                         | otherwise               = finalStatesDfa qs z
 
--- lookupCT :: (Eq st, Eq sy) => [st] -> sy -> CT st -> [sy] -> StDfa st
-lookupCT st sy []     v  = []
+lookupCT :: (Eq st, Eq sy) => [st] -> sy -> CT st -> [sy] -> StDfa st
+lookupCT _  _  []     _  = []
 lookupCT st sy (q:qs) v  | (fst q == st) = (snd q) !! col
                          | otherwise     = lookupCT st sy qs v
    where (Just col) = elemIndex sy v
@@ -103,8 +106,8 @@ lookupCT st sy (q:qs) v  | (fst q == st) = (snd q) !! col
 
 dfa2ndfa :: Dfa st sy -> Ndfa st sy
 dfa2ndfa (Dfa v q s z delta) = (Ndfa v q [s] z delta')
-  where delta' q (Just a) = [delta q a]
-        delta' q Nothing  = []
+  where delta' q' (Just a) = [delta q' a]
+        delta' _ Nothing  = []
 
 
 --
@@ -120,8 +123,8 @@ concatNdfa (Ndfa vp qp sp zp dp) (Ndfa vq qq sq zq dq) = Ndfa v' q' s' z' d'
         d' q | q `elem` zp = dp' q
              | q `elem` qp = dp  q
              | otherwise   = dq  q
-         where dp' q Nothing = (dp q Nothing) `union` sq
-               dp' q sy      = dp q sy
+         where dp' q'' Nothing = (dp q'' Nothing) `union` sq
+               dp' q'' sy      = dp q'' sy
 
 --
 -- Union Ndfa
@@ -133,8 +136,8 @@ unionNdfa (Ndfa vp qp sp zp dp) (Ndfa vq qq sq zq dq) = Ndfa v' q' s' z' d'
         q' = qp `union` qq
         s' = sp `union` sq
         z' = zp `union` zq
-        d' q | q `elem` qp = dp q
-             | q `elem` qq = dq q
+        d' q'' | q'' `elem` qp = dp q''
+               | q'' `elem` qq = dq q''
 
 --
 -- Star Ndfa
@@ -145,11 +148,11 @@ starNdfa (Ndfa v qs s z d) = Ndfa v qs s z d'
   where d' q | q `elem` s = ds' q
              | q `elem` z = dz' q
              | otherwise  = d q
-          where ds' q Nothing  = z `union` (d q Nothing)
-                ds' q sy       = d q sy
+          where ds' q' Nothing  = z `union` (d q' Nothing)
+                ds' q' sy       = d q' sy
 
-                dz' q Nothing  = s `union` (d q Nothing)
-                dz' q sy       = d q sy
+                dz' q' Nothing  = s `union` (d q' Nothing)
+                dz' q' sy       = d q' sy
 
 --
 -- Plus Ndfa
@@ -159,8 +162,8 @@ plusNdfa :: Eq st => Ndfa st sy -> Ndfa st sy
 plusNdfa (Ndfa v qs s z d) = Ndfa v qs s z d'
   where d' q | q `elem` z = dz' q
              | otherwise  = d q
-          where dz' q Nothing  = s `union` (d q Nothing)
-                dz' q sy       = d q sy
+          where dz' q' Nothing  = s `union` (d q' Nothing)
+                dz' q' sy       = d q' sy
 
 --
 -- Exponenciation
@@ -183,20 +186,20 @@ concatDfa (Dfa vp qp sp zp dp) (Dfa vq qq sq zq dq) = Ndfa v' q' s' z' d'
         s' = [sp]
         z' = zq
         q' = qp `union` qq
-        d' q | q `elem` zp = dz' q
-             | q `elem` qp = dp' q
-             | q `elem` qq = dq' q
-         where dz' q  Nothing = [sq]
-               dz' q (Just y) | y `elem` vp = [dp q y]
-                              | otherwise   = []
+        d' q2 | q2 `elem` zp = dz' q2
+              | q2 `elem` qp = dp' q2
+              | q2 `elem` qq = dq' q2
+         where dz' _  Nothing = [sq]
+               dz' q3 (Just y) | y `elem` vp = [dp q3 y]
+                               | otherwise   = []
 
-               dp' q Nothing  = []
-               dp' q (Just y) | y `elem` vp = [dp q y]
-                              | otherwise   = []
+               dp' _ Nothing  = []
+               dp' q3 (Just y) | y `elem` vp = [dp q3 y]
+                               | otherwise   = []
 
-               dq' q Nothing  = []
-               dq' q (Just y) | y `elem` vq = [dq q y]
-                              | otherwise   = []
+               dq' _ Nothing  = []
+               dq' q3 (Just y) | y `elem` vq = [dq q3 y]
+                               | otherwise   = []
 
 --
 -- Union of Dfa's
@@ -219,16 +222,16 @@ unionDfa (Dfa vp qp sp zp dp) (Dfa vq qq sq zq dq) = Ndfa v' q' s' z' d'
 
 starDfa :: Eq st => Dfa st sy -> Ndfa st sy
 starDfa (Dfa v q s z d) = Ndfa v q [s] z d'
-  where d' q | q == s     = ds' q
-             | q `elem` z = dz' q
-             | otherwise  = dd' q
-          where ds' q Nothing  = z
-                ds' q (Just y) = [d q y]
+  where d' q2 | q2 == s     = ds' q2
+              | q2 `elem` z = dz' q2
+              | otherwise   = dd' q
+          where ds' _ Nothing   = z
+                ds' q3 (Just y) = [d q3 y]
 
-                dz' q Nothing  = [s]
-                dz' q (Just y) = [d q y]
+                dz' _ Nothing   = [s]
+                dz' q3 (Just y) = [d q3 y]
 
-                dd' q (Just y) = [d q y]
+                dd' _ (Just y) = [d q2 y]
                 dd' _ _        = []
 
 --
@@ -237,10 +240,10 @@ starDfa (Dfa v q s z d) = Ndfa v q [s] z d'
 
 plusDfa :: Eq st => Dfa st sy -> Ndfa st sy
 plusDfa (Dfa v q s z d) = Ndfa v q [s] z d'
-  where d' q | q `elem` z = dz' q
-             | otherwise  = dd' q
-          where dz' q Nothing  = [s]
-                dz' q (Just y) = [d q y]
+  where d' q2 | q2 `elem` z = dz' q2
+              | otherwise  = dd' q2
+          where dz' _  Nothing  = [s]
+                dz' q3 (Just y) = [d q3 y]
 
-                dd' q (Just y) = [d q y]
+                dd' _ (Just y) = [d q2 y]
                 dd' _ _ = []

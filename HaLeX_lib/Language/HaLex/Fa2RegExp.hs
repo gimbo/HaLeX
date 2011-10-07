@@ -21,7 +21,6 @@ module Language.HaLex.Fa2RegExp ( dfa2RegExp
                                 ) where
 
 
-import Data.List
 import Language.HaLex.Util
 import Language.HaLex.RegExp
 import Language.HaLex.Dfa
@@ -45,6 +44,7 @@ toRegExp :: [sy] -> RegExp sy
 toRegExp []     = Empty
 toRegExp (x:xs) = toRegExp2 (x:xs)
 
+toRegExp2 :: [sy] -> RegExp sy
 toRegExp2 []     = Epsilon
 toRegExp2 [x]    = Literal x
 toRegExp2 (x:xs) = Or (Literal x) (toRegExp2 xs)
@@ -67,13 +67,14 @@ toRegExp' :: [Maybe sy] -> RegExp sy
 toRegExp' []     = Empty
 toRegExp' (x:xs) = toRegExp2' (x:xs)
 
+toRegExp2' :: [Maybe sy] -> RegExp sy
 toRegExp2' []     = Epsilon
 toRegExp2' [x]    = case x of
-                      Nothing    -> Epsilon
-                      (Just x )  -> Literal x
+                      Nothing   -> Epsilon
+                      (Just x') -> Literal x'
 toRegExp2' (x:xs) = case x of
-                      Nothing    -> Or Epsilon (toRegExp2' xs)
-                      (Just x )  -> Or (Literal x) (toRegExp2' xs)
+                      Nothing   -> Or Epsilon (toRegExp2' xs)
+                      (Just x') -> Or (Literal x') (toRegExp2' xs)
 
 
 
@@ -98,7 +99,7 @@ regular d v i j k  =  Or (Then (Then (regular d v i k (k-1))
 dfa2RegExp :: Eq sy
            => Dfa Int sy            -- ^ Deterministic Automaton
            -> RegExp sy             -- ^ Equivalent Regular Expression
-dfa2RegExp dfa@(Dfa v q s z delta) =
+dfa2RegExp dfa@(Dfa v _ s z delta) =
           limit simplifyRegExp (applyD delta v s z (sizeDfa dfa))
 
 applyD :: Num st
@@ -109,7 +110,7 @@ applyD :: Num st
        -> st
        -> RegExp sy
 
-applyD d v _ []     _   = Epsilon
+applyD _ _ _ []     _   = Epsilon
 applyD d v i (z:zs) k   = (regular d v i z k) `Or` (applyD d v i zs k)
 
 

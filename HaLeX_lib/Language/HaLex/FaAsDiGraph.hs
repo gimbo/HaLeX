@@ -26,25 +26,30 @@ module Language.HaLex.FaAsDiGraph (
                     , genOneArrow
                     ) where
 
-import Language.HaLex.RegExp
-import Language.HaLex.RegExp2Fa
 import Language.HaLex.Ndfa
 import Language.HaLex.Dfa
 import Language.HaLex.FaOperations
-import Language.HaLex.Minimize
 
 
 -- | Print a 'Ndfa' in GraphViz
+ndfa2graphviz :: (Show st, Show sy, Ord st, Eq sy) =>
+                 Ndfa st sy -> String -> String
 ndfa2graphviz ndfa name = tographviz ndfa name "circle" "LR" (show . show)
 
 -- | Print a 'Ndfa' in GraphViz in a file
+ndfa2graphviz2file :: (Show sy, Show st, Ord st, Eq sy) =>
+                      Ndfa st sy -> String -> IO ()
 ndfa2graphviz2file ndfa name = writeFile (name++".dot") (ndfa2graphviz ndfa  name)
 
 
 -- | Print a 'Dfa' in GraphViz
+dfa2graphviz :: (Show st, Show sy, Ord st, Eq sy) =>
+                Dfa st sy -> String -> String
 dfa2graphviz dfa name = tographviz (dfa2ndfa dfa) name "circle" "LR" (show . show)
 
 -- | Print a 'Dfa' in GraphViz in a file
+dfa2graphviz2file :: (Show sy, Show st, Ord st, Eq sy) =>
+                     Dfa st sy -> String -> IO ()
 dfa2graphviz2file dfa name = writeFile (name++".dot") (dfa2graphviz dfa  name)
 
 
@@ -74,30 +79,30 @@ tographviz ndfa@(Ndfa v q s z delta) name shape orientation showState =
     showElemsListPerLine (h:t) = ((showString h) "\n ") ++
                                  (showElemsListPerLine t)
 
-    showStates qs = [(showState q) ++
-                     " [shape=" ++ shape ++" , label=" ++ (showState q) ++ " ,color=black];"
-                    | q <- qs , not (ndfaIsStDead delta v z q ) ]
+    showStates qs = [(showState q') ++
+                     " [shape=" ++ shape ++" , label=" ++ (showState q') ++ " ,color=black];"
+                    | q' <- qs , not (ndfaIsStDead delta v z q' ) ]
 
     showInitialStates ss = map showInitialState ss
 
-    showInitialState  s = (showState s)
-                          ++ " [shape=" ++ shape ++ " , label= " ++ (showState s)
-                          ++ ", color=green];\n "
+    showInitialState  s' = (showState s')
+                           ++ " [shape=" ++ shape ++ " , label= " ++ (showState s')
+                           ++ ", color=green];\n "
 
 --    showFinalStates' :: Show a => [a] -> [String]
-    showFinalStates' zs = [ (showState z)
-                          ++ " [shape=double" ++ shape ++" , color=red];" | z <- zs ]
+    showFinalStates' zs = [ (showState z')
+                          ++ " [shape=double" ++ shape ++" , color=red];" | z' <- zs ]
 
 --     showNdfaArrows' :: (Eq sy,  Show sy) => Ndfa st sy -> [String]
-    showNdfaArrows' ndfa
+    showNdfaArrows' ndfa'
        = map (\ (o,l,d) -> genOneArrow (showState o) (show l) (showState d))
-             ((groupMoves . transitionTableNdfa) ndfa)
+             ((groupMoves . transitionTableNdfa) ndfa')
 
 --     showNdfaArrows'' :: (Ord st, Eq sy, Show st, Show sy) => Ndfa st sy -> [String]
-    showNdfaArrows'' ndfa@(Ndfa v q s z delta)
-         = map (\ (o,l,d) -> if (ndfaIsStDead delta v z o) || (ndfaIsStDead delta v z d) then ""
+    showNdfaArrows'' ndfa'@(Ndfa v' _ _ z' delta')
+         = map (\ (o,l,d) -> if (ndfaIsStDead delta' v' z' o) || (ndfaIsStDead delta' v' z' d) then ""
                              else genOneArrow (showState o) (showListMaybe l) (showState d))
-                                  ((groupMoves . transitionTableNdfa) ndfa)
+                                  ((groupMoves . transitionTableNdfa) ndfa')
 
 
 -- Creating the incoming arrows for the initial states
@@ -110,6 +115,7 @@ tographviz ndfa@(Ndfa v q s z delta) name shape orientation showState =
                                         createInitialArrows xs ys
 
 
+showListMaybe :: Show a => [Maybe a] -> String
 showListMaybe []     = ""
 showListMaybe (x:xs) = case x of
                        Just a -> (show a) ++ if (showListMaybe xs == "") then ""
@@ -122,7 +128,8 @@ showListMaybe (x:xs) = case x of
 -- the same origin and destination into a single transtion, whose transtion
 -- is the list of labels of the original transtions.
 --
-
+groupMoves :: (Eq sy, Eq st) =>
+              [(st, Maybe sy, st)] -> [(st, [Maybe sy], st)]
 groupMoves []           = []
 groupMoves ((o,l,d):rs) = res
   where (l',rs') = groupMoves' (o,l,d) ((o,l,d):rs)
@@ -141,7 +148,7 @@ groupMoves' (o,l,d) ((o',l',d'):rs)
 
 
 showNdfaArrows :: (Ord st,Show st,Show sy) => Ndfa st sy -> [String]
-showNdfaArrows (Ndfa vs qs s z delta) = [ genOneArrow (show q) (show v) (show r)
+showNdfaArrows (Ndfa vs qs _ z delta) = [ genOneArrow (show q) (show v) (show r)
                                         | q <- qs , v <- vs
                                         , r <- delta q (Just v)
                                         , not (ndfaIsStDead delta vs z r )
@@ -154,23 +161,30 @@ showNdfaArrows (Ndfa vs qs s z delta) = [ genOneArrow (show q) (show v) (show r)
                                         , not (ndfaIsStDead delta vs z q )
                                         ]
 
+genOneArrow :: Show a => String -> a -> String -> String
 genOneArrow orin label dest = orin
                               ++ " -> " ++ dest
                               ++ " [label = " ++ (show label) ++ "];"
 
 
-
+tographvizIO :: (Show st, Show sy, Ord st, Eq sy) =>
+                Ndfa st sy -> [Char] -> [Char] -> [Char] -> (st -> [Char]) -> IO ()
 tographvizIO ndfa name shape orientation showState =
    writeFile (name++".dot") (tographviz ndfa name shape orientation showState)
 
-
+dfa2DiGraphWithNoSyncSt :: (Show sy, Show st, Ord st, Eq sy) =>
+                           Dfa st sy -> String -> String
 dfa2DiGraphWithNoSyncSt dfa name = dfa2graphviz dfa name
 
+dfa2DiGraphIO :: (Show sy, Show st, Ord st, Eq sy) =>
+                 Dfa st sy -> String -> [Char] -> IO ()
 dfa2DiGraphIO dfa name fn = writeFile (fn++".gph") (dfa2graphviz dfa  name )
 
+dfaDiGraphWithNoSyncStIO :: (Show sy, Show st, Ord st, Eq sy) =>
+                            Dfa st sy -> String -> FilePath -> IO ()
 dfaDiGraphWithNoSyncStIO dfa name fn = writeFile fn (dfa2graphviz dfa  name)
 
--- dfa2DiGraphIO'' :: (Show sy, Ord sy , Eq st) => Dfa st sy -> [Char] -> IO ()
+dfa2DiGraphIO'' :: (Show sy, Ord sy, Ord st) => Dfa st sy -> String -> IO ()
 dfa2DiGraphIO'' dfa name = dfa2DiGraphIO (beautifyDfa dfa) name name
 
 

@@ -3,19 +3,19 @@
 -- Module      :  Language.HaLex.RegExp
 -- Copyright   :  (c) João Saraiva 2001,2002,2003,2004,2005
 -- License     :  LGPL
--- 
+--
 -- Maintainer  :  jas@di.uminho.pt
 -- Stability   :  provisional
 -- Portability :  portable
 --
--- Regular Expressions in Haskell. 
--- 
--- Code Included in the Lecture Notes on 
---          Language Processing (with a functional flavour).   
+-- Regular Expressions in Haskell.
+--
+-- Code Included in the Lecture Notes on
+--          Language Processing (with a functional flavour).
 --
 -----------------------------------------------------------------------------
 
-module Language.HaLex.RegExp ( 
+module Language.HaLex.RegExp (
               -- * Data type with recursion pattern
                 RegExp (..)
               , cataRegExp
@@ -45,10 +45,10 @@ data RegExp sy  = Empty                              -- ^ Empty Language
                 | OneOrMore (RegExp sy)              -- ^ One or more times (extended RegExp)
                 | Optional  (RegExp sy)              -- ^ Optional (extended RegExp)
    deriving (Read, Eq)
-   
+
 -- | Catamorphism induced by the 'RegExp' inductive data type
 
-cataRegExp :: ( re 
+cataRegExp :: ( re
               , re
               , re -> re -> re
               , re -> re
@@ -58,10 +58,10 @@ cataRegExp :: ( re
               , re -> re
               ) -> RegExp sy -> re
 
-cataRegExp (empty,epsilon,or,star,lit,th,one,opt) = cata
- where cata Empty          = empty 
+cataRegExp (empty,epsilon,orr,star,lit,th,one,opt) = cata
+ where cata Empty          = empty
        cata Epsilon        = epsilon
-       cata (Or er1 er2)   = or (cata er1) (cata er2)
+       cata (Or er1 er2)   = orr (cata er1) (cata er2)
        cata (Star er)      = star (cata er)
        cata (Literal a)    = lit a
        cata (Then er1 er2) = th (cata er1) (cata er2)
@@ -75,35 +75,35 @@ cataRegExp (empty,epsilon,or,star,lit,th,one,opt) = cata
 --   in the given sequence of characters. The regular expression is
 --   assumed not to contain 'OneOrMore' or 'Optional'. See also @matches'@.
 
-matchesRE :: Eq sy 
+matchesRE :: Eq sy
           => RegExp sy         -- ^ (canonical) Regular Expression
           -> [sy]              -- ^ Input Symbols
           -> Bool
-matchesRE Empty inp          = False
+matchesRE Empty _            = False
 matchesRE Epsilon inp        = inp == []
 matchesRE (Literal l) inp    = ([l] == inp)
-matchesRE (Or re1 re2) inp   = matchesRE re1 inp || matchesRE re2 inp 
-matchesRE (Then re1 re2) inp = or [ matchesRE re1 s1 && matchesRE re2 s2 
+matchesRE (Or re1 re2) inp   = matchesRE re1 inp || matchesRE re2 inp
+matchesRE (Then re1 re2) inp = or [ matchesRE re1 s1 && matchesRE re2 s2
                                   | (s1,s2) <- splits inp]
 matchesRE (Star re) inp      = matchesRE Epsilon inp ||
-                               or [ matchesRE re s1 && matchesRE (Star re) s2 
+                               or [ matchesRE re s1 && matchesRE (Star re) s2
                                   | (s1,s2) <- frontSplits inp ]
 
 -- | Test whether a match can be found for the given regular expression
 --   in the given sequence of characters. The regular expression is
 --   allowed to contain 'OneOrMore' or 'Optional'.
 
-matches' :: Eq sy 
-         => RegExp sy          -- ^ Regular Expression 
+matches' :: Eq sy
+         => RegExp sy          -- ^ Regular Expression
          -> [sy]               -- ^ Input Symbols
          -> Bool
 matches' = matchesRE . extREtoRE
 
 -- | Produce a list of all possible ways of splitting the input list
---   into two parts. For instance, 
--- @ 
---   splits "foo" 
---     = [(\"\","foo"),("f","oo"),("fo","o"),("foo",\"\")] 
+--   into two parts. For instance,
+-- @
+--   splits "foo"
+--     = [(\"\","foo"),("f","oo"),("fo","o"),("foo",\"\")]
 -- @
 
 splits :: [a]                -- ^ Input List
@@ -112,9 +112,9 @@ splits s = [ splitAt n s | n <- [ 0 .. length s ] ]
 
 
 -- | Produce a list of all possible ways of splitting the input list
---   into two parts where the first part is non-empy. For instance, 
--- @ 
---   splits "foo" 
+--   into two parts where the first part is non-empy. For instance,
+-- @
+--   splits "foo"
 --     = [("f","oo"),("fo","o"),("foo",\"\")]
 -- @
 
@@ -126,12 +126,12 @@ frontSplits s = [ splitAt n s | n <- [ 1 .. length s ] ]
 -- * Size
 
 -- | Compute the size of a regular expression.
---   We define the size of a regular expression as the number of occurrences 
+--   We define the size of a regular expression as the number of occurrences
 --   of symbols of the alfabeth
 
 sizeRegExp :: RegExp sy      -- ^ Regular Expression
            -> Int            -- ^ Size
-sizeRegExp = cataRegExp (0,0,(+),id,\x -> 1,(+),id,id)
+sizeRegExp = cataRegExp (0,0,(+),id,\_ -> 1,(+),id,id)
 
 
 -----------------------------------------------------------------------------
@@ -140,17 +140,17 @@ sizeRegExp = cataRegExp (0,0,(+),id,\x -> 1,(+),id,id)
 -- | Print regular expression to String as a catamorphism.
 --   A straightforward (catamorphic) show function.
 --
---   (it produces too many brackets, making it difficult to read or 
+--   (it produces too many brackets, making it difficult to read or
 --    understand the expression)
 
-showRE :: Show sy 
+showRE :: Show sy
        => RegExp sy        -- ^ Regular Expression
        -> [Char]           -- ^ String-based Regular Expression
 showRE = cataRegExp  ("{}"
                      , "@"
                      , \ l r -> "(" ++ l ++ "|" ++ r ++ ")"
                      , \ er  -> "(" ++ er ++ ")*"
-                     , show 
+                     , show
                      , \ l r -> "(" ++ l ++ r ++ ")"
                      , \ er  -> "(" ++ er ++ ")+"
                      , \ er  -> "(" ++ er ++ ")?"
@@ -167,7 +167,7 @@ instance Show sy => Show (RegExp sy) where
                                         . showChar '\''
                 | otherwise             = showChar c
 -}
-   	  showsPrec n (Star e)          = showsPrec 10 e . showChar '*'
+   	  showsPrec _ (Star e)          = showsPrec 10 e . showChar '*'
  	  showsPrec n (OneOrMore e)     = showParen (n == 4)
                                         $ showsPrec 10 e
                                         . showChar '+'
@@ -181,7 +181,8 @@ instance Show sy => Show (RegExp sy) where
                                         $ showsPrec 6 e1
                                         . showChar ' '
                                         . showsPrec 6 e2
- 
+
+isSymbol :: Char -> Bool
 isSymbol x = x `elem` "|? "
 
 -----------------------------------------------------------------------------
@@ -200,7 +201,7 @@ simplifyRegExp (Star x)     = case x' of                                -- Algeb
                                Or Epsilon a -> Star (simplifyRegExp a)  -- (a | @)* = a*
                                Or a Epsilon -> Star (simplifyRegExp a)  -- (@ | a)* = a*
                                _            -> Star x'
-  where x' = simplifyRegExp x 
+  where x' = simplifyRegExp x
 
 
 simplifyRegExp (Then x y)  | x' == Empty    = Empty                     -- {} p = {}
@@ -214,19 +215,19 @@ simplifyRegExp (Then x y)  | x' == Empty    = Empty                     -- {} p 
         y' =  simplifyRegExp y
 
 
-simplifyRegExp a@(Or x y)  
+simplifyRegExp a@(Or x y)
       | x' == y'                       = x'                             -- p  | p  = p
-      | x' == Empty                    = y'                             -- {} | p  = p 
+      | x' == Empty                    = y'                             -- {} | p  = p
       | y' == Empty                    = x'                             -- p  | {} = p
---    | x == (Star a) && y == Epsilon  = simplifyRegExp x       
+--    | x == (Star a) && y == Epsilon  = simplifyRegExp x
       | otherwise                      = f x' y'                        -- Or x' y'
-  where x' = simplifyRegExp x 
+  where x' = simplifyRegExp x
         y' = simplifyRegExp y
 
         f Epsilon (OneOrMore p) = Star p                                -- (@ | p+) = p*
-        f Epsilon re            = Optional re                           -- p | @    = p? 
+        f Epsilon re            = Optional re                           -- p | @    = p?
         f (OneOrMore p) Epsilon = Star p                                -- (p+ | @) = p*
-        f re Epsilon            = Optional re                           -- @ | p    = p? 
+        f re Epsilon            = Optional re                           -- @ | p    = p?
         f re1 re2               = Or re1 re2
 
 
@@ -245,19 +246,19 @@ simplifyRegExp (Optional x) = Optional (simplifyRegExp x)
 -- * Normalization
 
 -- | Rewrite extended regular expressions to
---   plain regular expression. This means that the 'OneOrMore' 
+--   plain regular expression. This means that the 'OneOrMore'
 --   and 'Optional' constructors are normalized away.
 
 extREtoRE :: RegExp sy -> RegExp sy
 extREtoRE  = cataRegExp ( Empty
-                        , Epsilon 
+                        , Epsilon
                         , \ l r -> Or l r
                         , \ er  -> Star er
-                        , \ a   -> Literal a 
-                        , \ l r -> Then l r 
+                        , \ a   -> Literal a
+                        , \ l r -> Then l r
                         , \ er  -> Then er (Star er)
                         , \ er  -> Or Epsilon er
-                        ) 
+                        )
 
 -----------------------------------------------------------------------------
 

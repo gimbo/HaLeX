@@ -16,15 +16,14 @@
 
 module Language.HaLex.Dfa2MDfa where
 
-import Data.List
 import Language.HaLex.Dfa
-import Language.HaLex.Ndfa
 import Language.HaLex.FaOperations
 import Language.HaLex.RegExp
 import Language.HaLex.RegExp2Fa
---import Language.HaLex.RegExpParser
 import Language.HaLex.Minimize
 
+showAsAccumDfa :: (Show sy, Show st) =>
+                  Dfa st sy -> String -> String
 showAsAccumDfa  (Dfa v q s z delta) =
                 showString ("dfa = Dfa v q s z delta") .
                 showString ("\n  where \n\t v = ") .
@@ -70,7 +69,8 @@ dfa2MIO afd = writeFile "GenMDfa.hs"
                          "import MonadState\n\n" ++
                           (showAsAccumDfa afd ""))
 
-
+re2MHaskellMod :: (Show sy, Ord sy) =>
+                  RegExp sy -> Bool -> Bool -> String
 re2MHaskellMod re m b = "module GenMDfa where\n\n" ++
                         "import Language.HaLex.DfaMonad\n\n" ++
                          "import MonadState\n\n" ++
@@ -105,14 +105,14 @@ re2MDfaIO'' er    = dfa2MIO dfa
 -}
 
 
-f (Just p ) = p
-f _         = Epsilon
+-- f (Just p ) = p
+-- f _         = Epsilon
 
 
 
 
 
-
+dfa_int :: Dfa Integer Char
 dfa_int = Dfa ['+','-','0','1']
               [1,2,3,4]
               1

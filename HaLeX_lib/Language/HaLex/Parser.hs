@@ -1,15 +1,15 @@
 --
 -- Parser Combinators Library
---        (Utrecht University style) 
+--        (Utrecht University style)
 --
 -- Code Included in the Lecture Notes on
--- 
---      Language Processing (with a functional flavour)             
+--
+--      Language Processing (with a functional flavour)
 --
 --
 -- copyright João Saraiva
 --           Department of Computer Science,
---           University of Minho, 
+--           University of Minho,
 --           Braga, Portugal
 --           jas@di.uminho.pt
 --           2001
@@ -31,13 +31,13 @@ type Parser s r = [s] -> [(r,[s])]
 -- Elementary Parser Combinators
 --
 
-symbol :: Eq a => a -> Parser a a 
+symbol :: Eq a => a -> Parser a a
 symbol _ []                 = []
 symbol s (x:xs) | x == s    = [(s,xs)]
                 | otherwise = []
 
 satisfy :: (s -> Bool) -> Parser s s
-satisfy p []                 = []
+satisfy _ []                 = []
 satisfy p (x:xs) | p x       = [(x,xs)]
                  | otherwise = []
 
@@ -56,12 +56,13 @@ succeed r xs = [(r,xs)]
 (<|>) :: Parser s a -> Parser s a -> Parser s a
 (p <|> q) xs = p xs ++ q xs
 
-
+(<*>) :: Parser s (a -> b) -> Parser s a -> Parser s b
 (p <*> q) xs = [ ( f z , zs )
                | ( f   , ys ) <- p xs
-               , (   z , zs ) <- q ys 
+               , (   z , zs ) <- q ys
                ]
 
+(<$>) :: (a -> b) -> Parser s a -> Parser s b
 (f <$> p) xs = [(f y, ys) | (y,ys) <- p xs ]
 
 

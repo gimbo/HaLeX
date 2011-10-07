@@ -2,7 +2,7 @@
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Language.HaLex.Dfa
--- Copyright   :  (c) Jo‹oo Saraiva 2001,2002,2003,2004,2005
+-- Copyright   :  (c) João Saraiva 2001,2002,2003,2004,2005
 -- License     :  LGPL
 --
 -- Maintainer  :  jas@di.uminho.pt
@@ -21,6 +21,7 @@ module Language.HaLex.Dfa (
                 Dfa (..)
               -- * Acceptance
               , dfaaccept
+              , dfaaccept'
               , dfawalk
               -- * Transformation
               , ttDfa2Dfa
@@ -75,7 +76,7 @@ dfawalk :: (st -> sy -> st) -- ^ Transition function
         -> st               -- ^ Initial state
         -> [sy]             -- ^ Input symbols
         -> st               -- ^ Final state
-dfawalk delta s [] = s
+dfawalk _     s [] = s
 dfawalk delta s (x:xs) = dfawalk delta (delta s x) xs
 
 
@@ -86,7 +87,7 @@ dfaaccept' :: Eq st
            => Dfa st sy  -- ^ Automaton
            -> [sy]       -- ^ Input symbols
            -> Bool
-dfaaccept' (Dfa v q s z delta) simb  = (dfawalk delta s simb) `elem` z
+dfaaccept' (Dfa _ _ s z delta) simb  = (dfawalk delta s simb) `elem` z
 
 
 -- | Test whether the given automaton accepts the given list of
@@ -96,7 +97,7 @@ dfaaccept :: Eq st
            => Dfa st sy  -- ^ Automaton
            -> [sy]       -- ^ Input symbols
            -> Bool
-dfaaccept (Dfa v q s z delta) simb   = (foldl delta s simb) `elem` z
+dfaaccept (Dfa _ _ s z delta) simb   = (foldl delta s simb) `elem` z
 
 
 
@@ -106,7 +107,7 @@ dfaaccept (Dfa v q s z delta) simb   = (foldl delta s simb) `elem` z
 -- | Print a 'Dfa' as a Haskell function.
 
 instance (Show st, Show sy) => Show (Dfa st sy) where
-      showsPrec p (Dfa v q s z delta) =
+      showsPrec _ (Dfa v q s z delta) =
                 showString ("dfa = Dfa v q s z delta") .
                 showString ("\n  where \n\t v = ") .
                 showList v .
@@ -213,7 +214,7 @@ stPath d v sts = sort $ nub $
 transitionTableDfa :: (Ord st, Ord sy)
                    => Dfa st sy          -- ^ Automaton
                    -> [(st,sy,st)]       -- ^ Transition table
-transitionTableDfa (Dfa v q s z delta) = sort [ ( aq , av , delta aq av)
+transitionTableDfa (Dfa v q _ _ delta) = sort [ ( aq , av , delta aq av)
                                               | aq <- q
                                               , av <- v
                                               ]
@@ -236,7 +237,7 @@ ttDfa2Dfa :: (Eq st, Eq sy)
 ttDfa2Dfa (vs,qs,s,z,ld) = Dfa vs qs s z d
   where d st sy =  lookUptt st sy ld
 
-        lookUptt q v ((a,b,c) : [])                    = c
+        lookUptt _ _ ((_,_,c) : [])                    = c
         lookUptt q v ((a,b,c) : xs) | q == a && v == b = c
                                     | otherwise        = lookUptt  q v xs
 
@@ -264,14 +265,14 @@ lookupNewSt s (h:t) | snd h == s = fst h
                     | otherwise  = lookupNewSt s t
 
 getNewFinalSt :: Eq st => [st] -> [(st,[Int])] -> [[Int]]
-getNewFinalSt [] qaux = []
+getNewFinalSt []    _    = []
 getNewFinalSt (h:t) qaux = (lookupSt h qaux) : getNewFinalSt t qaux
 
 giveNumber :: Eq st
            => [[st]]
            -> Int             -- ^ Initial number
            -> [([st],[Int])]  -- ^ ??
-giveNumber []    i = []
+giveNumber []    _ = []
 giveNumber (h:t) i | h == []   = giveNumber t i
                    | otherwise = (h,[i]) : giveNumber t (i+1)
 
@@ -281,8 +282,11 @@ giveNumber (h:t) i | h == []   = giveNumber t i
 
 type TableDfa st = [(st, [st])]
 
+stsDfa :: [(st, [st])] -> [st]
 stsDfa      = map fst
+stsRHS :: [(st, [st])] -> [[st]]
 stsRHS      = map snd
+allstsTable :: [(st, [st])] -> [st]
 allstsTable = concat . stsRHS
 
 
@@ -292,7 +296,7 @@ allstsTable = concat . stsRHS
 dfa2tdfa :: (Eq st, Ord sy)
          => Dfa st sy              -- ^ Automaton
          -> TableDfa st            -- ^ Transition table
-dfa2tdfa (Dfa v q s z delta) = limit (dfa2tdfaStep delta v') tbFstRow
+dfa2tdfa (Dfa v _ s _ delta) = limit (dfa2tdfaStep delta v') tbFstRow
   where v'       = sort v
         tbFstRow = consRows delta [s] v'
 
@@ -309,7 +313,7 @@ dfa2tdfaStep delta alfabet tb = tb `union` (consRows delta newSts alfabet)
 
 
 consRows :: (st -> sy -> st) -> [st] -> [sy] -> TableDfa st
-consRows delta []     alfabet = []
+consRows _     []     _       = []
 consRows delta (q:qs) alfabet = (q , oneRow delta q alfabet) :
                                 (consRows delta qs alfabet)
 
@@ -325,13 +329,13 @@ renameDfa :: (Ord st, Ord sy)
           => Dfa st sy      -- ^ Automaton
           -> Int            -- ^ Initial state ID
           -> Dfa Int sy     -- ^ Renamed automaton
-renameDfa dfa@(Dfa v q s z delta) istid = Dfa v' q' s' z' delta'
+renameDfa dfa@(Dfa v _ _ z delta) istid = Dfa v' q' s' z' delta'
   where v'     = sort v
         q'     = sort $ map snd newSts
         tb     = dfa2tdfa dfa
         s'     = istid
         newSts = newStsOfTable tb s'
-        z'     = sort $ map snd (filter (\(a,b) -> a `elem` z) newSts)
+        z'     = sort $ map snd (filter (\(a,_) -> a `elem` z) newSts)
         delta' newSt sy = lookupNewSts delta newSt sy newSts
 
 --
@@ -343,7 +347,7 @@ newStsOfTable tb ini = newStsOfTableAux tb [(fst $ head tb,ini)]
 
 newStsOfTableAux :: Eq a => [(b,[a])] -> [(a,Int)] -> [(a,Int)]
 newStsOfTableAux []           newSt = newSt
-newStsOfTableAux ((st,sts):t) newSt = newSt''
+newStsOfTableAux ((_,sts):t) newSt = newSt''
     where newSt' = procrhsSts sts newSt
           newSt'' =  newStsOfTableAux t newSt'
 
@@ -354,11 +358,15 @@ procrhsSts (st:sts) newSt
      | otherwise = newSt'
         where newSt' = procrhsSts sts ((st,( snd $ head newSt) + 1) : newSt)
 
+lookupNewSts :: (Eq st1, Eq st2) =>
+                (st1 -> sy -> st1) -> st2 -> sy -> [(st1, st2)] -> st2
 lookupNewSts delta newSt sy newSts = getNewSt newOldSt newSts
   where newOldSt = delta (getOldSt newSt newSts) sy
 
-getNewSt oldSt newSts = snd $ head (filter (\(a,b) -> a == oldSt) newSts)
-getOldSt newSt newSts = fst $ head (filter (\(a,b) -> b == newSt) newSts)
+getNewSt :: Eq st1 => st1 -> [(st1, st2)] -> st2
+getNewSt oldSt newSts = snd $ head (filter (\(a,_) -> a == oldSt) newSts)
+getOldSt :: Eq st2 => st2 -> [(st1, st2)] -> st1
+getOldSt newSt newSts = fst $ head (filter (\(_,b) -> b == newSt) newSts)
 
 
 
@@ -379,7 +387,7 @@ beautifyDfa dfa = renameDfa dfa 1
 dfadeadstates :: Ord st
               => Dfa st sy      -- ^ Automaton
               -> [st]           -- ^ Dead states
-dfadeadstates (Dfa v qs s z d) = filter (isStDead d v z) qs
+dfadeadstates (Dfa v qs _ z d) = filter (isStDead d v z) qs
 
 
 -- | Compute the size of a deterministic finite automaton.
@@ -422,7 +430,7 @@ isStSync :: Eq st
          -> [st]                    -- ^ Set of Final States
          -> st                      -- ^ State
          -> Bool
-isStSync d vs z st = and qs
+isStSync d vs _ st = and qs
   where qs = [ st == dfawalk d st [v]
              | v <- vs
              ]

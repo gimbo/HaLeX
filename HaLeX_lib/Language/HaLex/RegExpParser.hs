@@ -58,7 +58,7 @@ term =  f  <$> factor <*> symbol '?'
 
 factor :: Parser Char (RegExp  Char)
 factor =  f <$> letterOrDigit
-      <|> g <$> symbol '\'' <*> satisfy (\ x -> True) <*> symbol '\''
+      <|> g <$> symbol '\'' <*> satisfy (const True) <*> symbol '\''
       <|> h <$> symbol '(' <*> expr <*> symbol ')'
   where
      f a     = Literal a

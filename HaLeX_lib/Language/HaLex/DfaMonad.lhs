@@ -26,8 +26,7 @@
 module Language.HaLex.DfaMonad where
 
 import Data.Char
-import Data.List
-import Language.HaLex.Ndfa
+import Control.Monad.Identity
 import Control.Monad
 import Control.Monad.State
 
@@ -123,7 +122,7 @@ showInDot :: (Monad m , Eq st , Show st , Show sy)
           -> Bool                     -- Result's Type: True -> Show Dead States
                                       --                 False -> Don't Show Dead States
           -> m [Char]                 -- The Dot string
-showInDot dfa@(Dfa v q s z delta) t =
+showInDot dfa@(Dfa _ _ s z _) t =
    do dsts <- deadstates dfa
       let a = showString ("digraph fa {\n") .
               showString ("rankdir = LR ;\n") .
@@ -139,16 +138,17 @@ showElemsListPerLine :: [String] -> String
 showElemsListPerLine []    = ""
 showElemsListPerLine (h:t) = ((showString h) "\n") ++ (showElemsListPerLine t)
 
+showInitialState :: Show st => st -> String -> String
 showInitialState s = showString("\"") . shows s .  showChar('\"') .
                      showString (" [shape=circle , color=green];\n")
 
--- showFinalStates' :: Show a => [a] -> [String]
+showFinalStates' :: Show st => [st] -> [String]
 showFinalStates' z = [ "\"" ++ (show f) ++ "\""
                        ++ " [shape=doublecircle , color=red];" | f <- z ]
 
 showArrows :: (Monad m, Eq st , Show st, Show sy)
            => Dfa m st sy -> [st] -> Bool -> m [[Char]]
-showArrows (Dfa v qs s z delta) dsts t  =
+showArrows (Dfa v qs _ _ delta) dsts t  =
    do let qs' = if t then qs else qs <-> dsts
       xpto [ mapM (buildLine q delta dsts t) v | q <- qs'  ]
 
@@ -180,7 +180,7 @@ xpto (x:xs) = do rx <- x
 \begin{code}
 
 deadstates :: (Monad m , Eq st) => Dfa m st sy -> m [st]
-deadstates (Dfa v qs s z d) = deadstates' qs v d
+deadstates (Dfa v qs _ _ d) = deadstates' qs v d
 
 deadstates' :: (Monad m, Eq st) => [st] -> [sy] -> (st -> sy -> m st) -> m [st]
 deadstates' [] _ _ = return []
@@ -206,7 +206,7 @@ isStDead = isSyncState
 isSyncState :: (Monad m, Eq st) => st -> m [st] -> m Bool
 isSyncState st msts = do sts <- msts
                          return (and (isin' st sts))
-  where isin' e []     = [True]
+  where isin' _ []     = [True]
         isin' e (x:xs) = (e==x) : isin' e xs
 
 \end{code}
@@ -242,11 +242,13 @@ robot = Dfa ["esquerda","direita","largar","pegar"]
     delta "C1 com pepita" _          = return "C1 com pepita"
 
 
+moves, moves2, moves3, moves4 :: [String]
 moves = ["direita","pegar","esquerda","largar"]
 moves2 = ["esquerda","pegar","direita","pegar","esquerda","largar"]
 moves3 = ["esquerda","pegar","direita"]
 moves4 = moves2 ++ moves ++ moves3
 
+acc :: Maybe Bool
 acc = dfaaccept robot moves4
 
 {-
@@ -267,6 +269,7 @@ Just True
 
 
 \begin{code}
+varGlob :: IORef [Char]
 varGlob = unsafePerformIO $ newIORef ""
 
 ex2 :: Dfa IO Char Char
@@ -350,6 +353,8 @@ ex3 = Dfa ['a','b']
     countA = state f
       where f s = ((),s+1)
 
+runAccept :: (Num s, Eq st) =>
+             Dfa (StateT s Identity) st sy -> [sy] -> (Bool, s)
 runAccept dfa str = runState (dfaaccept dfa str) 0
 
 
@@ -377,6 +382,8 @@ ex4 = Dfa ['a','b']
                        return 'C'
 
 
+runAccept_ex4 :: Eq st =>
+                 Dfa (StateT [Char] Identity) st sy -> [sy] -> (Bool, [Char])
 runAccept_ex4 dfa str = runState (dfaaccept dfa str) ""
 
 
@@ -403,6 +410,7 @@ ex5 = Dfa ['a','b']
 
     accum x = modify (\ s -> x:s)
 
+runAccept_ex5 :: [Char] -> (Bool, [Char])
 runAccept_ex5 str = runState (dfaaccept ex5 str) ""
 \end{code}
 
@@ -427,14 +435,10 @@ ex_int = Dfa ['+','-','d']
              delta
   where
     delta 1 '+' = return 2
-    delta 1 '-' = do accumM
-                     return 2
-    delta 1 'd' = do accumD
-                     return 3
-    delta 2 'd' = do accumD
-                     return 3
-    delta 3 'd' = do accumD
-                     return 3
+    delta 1 '-' = accumM >> return 2
+    delta 1 'd' = accumD >> return 3
+    delta 2 'd' = accumD >> return 3
+    delta 3 'd' = accumD >> return 3
 
     accumM = state f
       where f s = (s,'-':s)
@@ -443,6 +447,7 @@ ex_int = Dfa ['+','-','d']
       where f s = (s,'d':s)
 
 
+runAccept_int :: [Char] -> (Bool, [Char])
 runAccept_int str = runState (dfaaccept ex_int str) ""
 \end{code}
 
@@ -491,6 +496,7 @@ ex6 = Dfa ['+','-','1','2',' ']
       where f s = ((),(fst s,(read (fst s))::Int))
 
 
+runAccept_ex6 :: [Char] -> (Bool, ([Char], Int))
 runAccept_ex6 str = runState (dfaaccept ex6 str) ("",0::Int)
 
 
@@ -526,7 +532,7 @@ te = Dfa ['A','x','1','0',' ']
          [3,4]
          delta
   where
-    delta 1 'A' = do init
+    delta 1 'A' = do initial
                      return 2
     delta 2 x | isLower x  = do accum x
                                 return 3
@@ -536,10 +542,10 @@ te = Dfa ['A','x','1','0',' ']
     delta 3 x | isLower x || isDigit x  = do accum x
                                              return 3
               | otherwise = return 20
-    delta 4 'A' = do init
+    delta 4 'A' = do initial
                      return 2
 
-    delta 4 'P' = do init
+    delta 4 'P' = do initial
                      return 9
     delta 9 x | isDigit x = do accum x
                                return 10
@@ -554,7 +560,7 @@ te = Dfa ['A','x','1','0',' ']
     accum x = state f
       where f s = ((),((fst s)++[x],snd s))
 
-    init = state f
+    initial = state f
       where f s = ((),("",snd s))
 
     open = state f
@@ -564,6 +570,7 @@ te = Dfa ['A','x','1','0',' ']
       where f s = ((),(fst s,(snd s) ++ [Locate (read (fst s))]))
 
 
+runAccept_te :: [Char] -> (Bool, ([Char], [Code]))
 runAccept_te str = runState (dfaaccept te str) ("",[])
 
 \end{code}
@@ -601,14 +608,14 @@ pr = Dfa ['1','0']
     delta 7  '1' = return 9
     delta 8  '0' = return 10
     delta 9  '1' = return 11
-    delta 10 '1' = do { init ; return 4 }
-    delta 11 '1' = do { init ; return 12 }
+    delta 10 '1' = do { initial ; return 4 }
+    delta 11 '1' = do { initial ; return 12 }
 
     delta _ _ = return 13
 
 
     accum x = modify (\ s -> ((fst s)++[x],snd s))
-    init        = modify (\ s -> ("",snd s))
+    initial     = modify (\ s -> ("",snd s))
     accumList   = modify (\ s -> (fst s,snd s ++ [converte (fst s)]))
 
 
@@ -617,6 +624,7 @@ converte []       = 0
 converte ('0':xs) = converte xs
 converte ('1':xs) = expo 2 (length xs) + converte xs
 
+expo :: Int -> Int -> Int
 expo v e | e > 0     = v * (expo v (e-1))
          | otherwise = 1
 

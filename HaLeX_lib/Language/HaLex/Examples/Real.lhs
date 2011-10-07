@@ -46,7 +46,6 @@ Real Numbers.}
 \begin{code}
 module Language.HaLex.Examples.Real where
 
-import Data.List
 import Language.HaLex.RegExp
 import Language.HaLex.Dfa
 import Language.HaLex.Ndfa
@@ -56,38 +55,41 @@ import Language.HaLex.FaOperations
 import Language.HaLex.FaAsDiGraph
 
 import Language.HaLex.Minimize
-import Language.HaLex.RegExpAsDiGraph
---import RegExpParser
-
-import Language.HaLex.Fa2RegExp
 
 import qualified Language.HaLex.FaClasses as Fa
 
 
 
 
-
+sinal'' :: RegExp Char
 sinal'' = (Literal '-') `Or` (Literal '+') `Or` Epsilon
 
+
+d :: RegExp Char
 d = Literal 'd'
 
 
+re_int :: RegExp Char
 re_int = sinal'' `Then` d `Then` (Star d)
 
 
+intdfa :: Dfa Int Char
 intdfa = (beautifyDfa . ndfa2dfa . regExp2Ndfa) re_int
 
 
+d' :: RegExp Char
 d' = (Literal '0') `Or`  (Literal '1') `Or`  (Literal '2') `Or`
      (Literal '3') `Or`  (Literal '4') `Or`  (Literal '5') `Or`
      (Literal '6') `Or`  (Literal '7') `Or`  (Literal '8') `Or`
      (Literal '9')
 
 
+re_real :: RegExp Char
 re_real = sinal'' `Then` (Star d')
                   `Then` ((Literal '.') `Or` Epsilon)
                   `Then` d' `Then` (Star d')
 
+re_real' :: RegExp Char
 re_real' = sinal'' `Then` (Star d)
                   `Then` ((Literal '.') `Or` Epsilon)
                   `Then` d `Then` (Star d)
@@ -95,22 +97,29 @@ re_real' = sinal'' `Then` (Star d)
 
 
 
+cre_real :: [Char]
 cre_real = "('+'|'-')?d*('.')?d+"
 
 
+realdfa' :: Dfa Int Char
 realdfa' = (beautifyDfa . ndfa2dfa . regExp2Ndfa) re_real
 
+realdfa'' :: Dfa Int Char
 realdfa'' = (beautifyDfa . minimizeDfa . ndfa2dfa . regExp2Ndfa) re_real'
 
+realdfa''' :: Dfa Int Char
 realdfa''' = (beautifyDfa . stdMinimizeDfa . ndfa2dfa . regExp2Ndfa) re_real'
 
 
-
+realdfa'''' :: Dfa Int Char
 realdfa'''' = beautifyDfa . minimizeNdfa . regExp2Ndfa $ re_real'
 
+genGraph :: (Show sy, Show st, Ord st, Eq sy) =>
+            Ndfa st sy -> [Char] -> [Char] -> (st -> [Char]) -> IO ()
 genGraph fa = tographvizIO fa "exp"
 
 
+realdfa :: Dfa Char Char
 realdfa = Dfa ['+','-','.','0','1','2','3','4','5','6','7','8','9']
               ['A','B','C','D','E','F']
               'A'
@@ -173,12 +182,14 @@ Real Numbers.}
 
 \begin{code}
 
+realndfa :: Ndfa Char Char
 realndfa = Ndfa ['+','-','.','0','1','2','3','4','5','6','7','8','9']
                 ['A','B','C','D','E']
                 ['A','C']
                 ['C','E']
                 deltaNdfa
 
+deltaNdfa :: Char -> Maybe Char -> [Char]
 deltaNdfa 'A' (Just '+') = ['B']
 deltaNdfa 'A' (Just '-') = ['B']
 deltaNdfa 'A' Nothing    = ['B']
@@ -223,7 +234,7 @@ deltaNdfa 'E' (Just '9') = ['E']
 
 deltaNdfa _ _ = []
 
--- isrealNdfa :: Fa (Ndfa Char Char) Char => String -> Bool
+isrealNdfa :: [Char] -> Bool
 isrealNdfa = Fa.accept realndfa
 
 \end{code}

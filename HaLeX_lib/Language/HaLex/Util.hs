@@ -1,7 +1,7 @@
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Language.HaLex.Edfa
--- Copyright   :  (c) Joãoo Saraiva 2001,2002,2003,2004,2005
+-- Copyright   :  (c) JoÅ„o Saraiva 2001,2002,2003,2004,2005
 -- License     :  LGPL
 --
 -- Maintainer  :  jas@di.uminho.pt
@@ -52,5 +52,6 @@ insAllPos e l = [ insAtPos i e l
                 | i <- [1..length l + 1]
                 ]
 
+insAtPos :: Num n => n -> a -> [a] -> [a]
 insAtPos 1 e l       = e : l
 insAtPos i e (x:xs)  = x : insAtPos (i-1) e xs

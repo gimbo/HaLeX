@@ -30,10 +30,7 @@ import Language.HaLex.RegExpAsDiGraph
 import Language.HaLex.Equivalence
 
 import Language.HaLex.Dfa
-import Language.HaLex.Ndfa
 import Language.HaLex.Minimize
-import Language.HaLex.FaAsDiGraph
-import Language.HaLex.Parser
 
 import Language.HaLex.Dfa2MDfa
 
@@ -83,7 +80,7 @@ main =
      let (o,n,errs) = getOpt Permute options args
      let (re,opts')  = partition ((=='r') . head) o
      let (fo,opts'') = partition ((=='o') . head) opts'
-     let output = map tail re ++ repeat ""
+     -- let output = map tail re ++ repeat ""
      let opts = opts''
      if (errs /= []) || ("h" `elem` opts)
         then putStr $ usageInfo usageheader options
@@ -117,10 +114,13 @@ compileFromFile re filei fileo opts
                                 else " The regular expressions are not equivalent")
 
 
+compileFromStdIn :: [String] -> [String] -> IO ()
 compileFromStdIn fileo opts
   = do (Just s) <- readRegExpFileHandle stdin
        compileRegExp s fileo opts
 
+compileRegExp :: (Show sy, Ord sy) =>
+                 RegExp sy -> [String] -> [String] -> IO ()
 compileRegExp re fileo opts
   = do let fw = if (fileo == [])
                 then if ("E" `elem` opts)
